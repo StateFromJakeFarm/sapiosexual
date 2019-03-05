@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy.random as rand
 
-class Model:
+class Model(nn.Module):
     '''
     Contains components of a neural network to be evolved
     '''
@@ -11,6 +11,7 @@ class Model:
         '''
         Constructor
         '''
+        super(Model, self).__init__()
         self.layers = nn.Sequential()
         self.acc = -1
         self.train_time = -1
@@ -49,6 +50,12 @@ class Model:
 
         if layer_type == nn.Linear:
             return nn.Linear(input_dim, output_dim), 'Linear'
+
+    def forward(self, x):
+        '''
+        Forward propogation
+        '''
+        return self.layers.forward(x)
 
     def print(self):
         '''

@@ -20,7 +20,7 @@ class Evolver:
         self.output_dim = output_dim
         self.pop_size = pop_size
         self.num_generations = num_generations
-        self.loss_function = loss_function
+        self.loss_function = loss_function()
         self.optimizer = optimizer
         self.desirable_traits = desirable_traits
         self.num_epochs = num_epochs
@@ -41,6 +41,7 @@ class Evolver:
         '''
         optimizer = self.optimizer(member.parameters(), lr=self.alpha)
         start = time.time()
+
         for epoch in range(self.num_epochs):
             for sample in train_set:
                 # Run data through network
@@ -72,11 +73,15 @@ class Evolver:
         Simulate evolution of neural networks
         '''
         # Initialize the beginning population
-        init_pop()
+        self.init_pop()
 
         # Simulate each generation
         for gen in range(self.num_generations):
             # Train each member of the population
-            for member in self.pop:
-                train_time = train(member, train_set)
-                acc = test(member, test_set)
+            for i, member in enumerate(self.pop):
+                member = member.float()
+                train_time = self.train(member, train_set)
+                acc = self.test(member, test_set)
+
+                print('{}/{}: acc = {} train time = {}'.format(
+                    i, self.pop_size, acc, train_time))
