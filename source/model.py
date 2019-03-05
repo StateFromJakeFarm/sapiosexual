@@ -12,6 +12,8 @@ class Model:
         Constructor
         '''
         self.layers = nn.Sequential()
+        self.acc = -1
+        self.train_time = -1
 
         # Begin by randomly-initializing the network
         layer_input_dim = -1
