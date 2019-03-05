@@ -7,7 +7,7 @@ class Model(nn.Module):
     '''
     Contains components of a neural network to be evolved
     '''
-    def __init__(self, max_layers, max_layer_size, layer_types, input_dim, output_dim):
+    def __init__(self, layers=None):
         '''
         Constructor
         '''
@@ -16,7 +16,14 @@ class Model(nn.Module):
         self.acc = -1
         self.train_time = -1
 
-        # Begin by randomly-initializing the network
+        if layers:
+            # Use provided network architecture
+            self.layers = layers
+
+    def init_random(self, max_layers, max_layer_size, layer_types, input_dim, output_dim):
+        '''
+        Create a random structure for the network
+        '''
         layer_input_dim = -1
         self.length = rand.randint(2, max_layers) # Number of layers in network
         for i in range(self.length):
@@ -25,31 +32,32 @@ class Model(nn.Module):
                 # This is the first layer in the network, enforce input dimension to
                 # match data
                 layer_input_dim = input_dim
+
             if i == self.length-1:
                 # This is the last layer in the network, enforece output dimension to
                 # match data
                 layer_output_dim = output_dim
+            else:
+                # This is an intermediate layer, initialize with random output dimension
+                layer_output_dim = rand.randint(1, max_layer_size)
 
             # Initialize layer
-            layer, layer_type = self.init_layer(rand.choice(layer_types), max_layer_size,
+            layer = self.init_layer(rand.choice(layer_types), max_layer_size,
                 layer_input_dim, layer_output_dim)
 
             # Update input dimension for next layer
             layer_input_dim = layer.out_features
 
             # Add layer to our container (which represents entire network architecture)
-            self.layers.add_module('{}_{}'.format(layer_type, i), layer)
+            self.layers.add_module(str(i), layer)
+
 
     def init_layer(self, layer_type, max_layer_size, input_dim, output_dim):
         '''
         Randomly initialize layer's features
         '''
-        if output_dim == -1:
-            # This is not the last layer in the network
-            output_dim = rand.randint(1, max_layer_size)
-
         if layer_type == nn.Linear:
-            return nn.Linear(input_dim, output_dim), 'Linear'
+            return nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
         '''
