@@ -76,7 +76,7 @@ class Evolver:
             err += self.loss_function(output, sample[1])
 
             if print_outputs:
-                print(sample[0], output)
+                print(sample[1], output)
 
         return err/len(test_set)
 
@@ -89,40 +89,57 @@ class Evolver:
     def gen_mutation(self):
         layer_type = rand.choice(self.layer_types)
         if layer_type == nn.Linear:
-            input_dim = rand.randint(1, self.max_layer_size)
-            output_dim = rand.randint(1, self.max_layer_size)
+            input_dim = rand.randint(2, self.max_layer_size)
+            output_dim = rand.randint(2, self.max_layer_size)
             return nn.Linear(input_dim, output_dim)
+
+    def crossover(self, p1, p2):
+        '''
+        Create child by crossing traits (layers) of two parents
+        '''
+        # Must include first and last layers
+        p1_ind = 1
+        if p1.length > 2:
+            p1_ind = rand.randint(1, p1.length-1)
+        p2_ind = 1
+        if p2.length > 2:
+            p2_ind = rand.randint(1, p2.length-1)
+
+        # Splice layers
+        layers = nn.Sequential()
+        for i in range(p1_ind+1):
+            layers.add_module(str(i), p1.layers[i])
+
+        for i in range(p2.length - p2_ind):
+            if i == 0:
+                layer = nn.Linear(p1.layers[p1_ind-1].out_features, p2.layers[p2_ind+i].out_features)
+            else:
+                layer = p2.layers[p2_ind+i]
+
+            layers.add_module(str(p1_ind+i), layer)
+
+        return Model(layers=layers)
 
     def breed(self, parents):
         '''
         Mix features of parents and add mutations to produce next generation
         '''
-        self.members = []
-        for i, p1 in enumerate(parents[:2:]):
-            if i*2+1 >= len(parents):
-                p2 = parents[0]
+        self.pop = []
+        for i, p1 in enumerate(parents):
+            if i+1 >= len(parents):
+                # Recycle best member if there aren't enough "top" members for
+                # exclusive pairings
+                p2 = parents[1]
             else:
-                p2 = parents[i*2+1]
+                p2 = parents[i+1]
 
-            # Must include first and last layers
-            p1_ind = rand.randint(1, p1.length-1)
-            p2_ind = rand.randint(1, p2.length-1)
+            # Create two children with p1 -> p2
+            self.pop.append(self.crossover(p1, p2))
+            self.pop.append(self.crossover(p1, p2))
 
-            layers = nn.Sequential()
-            for i in range(p1_ind):
-                if i > 0 and rand.ranf() < self.mutation_pct:
-                    mutated_layer = self.gen_mutation()
-                    layers.add_module(str(i), mutated_layer)
-                else:
-                    layers.add_module(str(i), p1.layers[i])
-            for i in range(p2.length - p2_ind):
-                if i < p2.length-p2_ind-1 and rand.ranf() < self.mutation_pct:
-                    mutated_layer = self.gen_mutation()
-                    layers.add_module(str(i), mutated_layer)
-                else:
-                    layers.add_module(str(p2_ind+i), p2.layers[p2_ind+i])
-
-            self.members.append(Model(layers=layers))
+            # Create two children with p2 -> p1
+            self.pop.append(self.crossover(p2, p1))
+            self.pop.append(self.crossover(p2, p1))
 
     def print_stats(self):
         '''
@@ -130,11 +147,11 @@ class Evolver:
         '''
         avg_len = np.mean([m.length for m in self.pop])
         avg_layer_size = np.mean([np.mean([l.in_features + l.out_features for l in m.layers]) for m in self.pop])
-        avg_avg_err = np.mean([float(m.avg_err) for m in self.pop])
+        lowest_avg_err = min([float(m.avg_err) for m in self.pop])
         avg_train_time = np.mean([float(m.train_time) for m in self.pop])
 
-        print('  avg_len = {}\n  avg_layer_size = {}\n  avg_avg_err = {}\n  avg_train_time = {}'.format(
-            avg_len, avg_layer_size, avg_avg_err, avg_train_time))
+        print('  avg_len = {}\n  avg_layer_size = {}\n  lowest_avg_err = {}\n  avg_train_time = {}'.format(
+            avg_len, avg_layer_size, lowest_avg_err, avg_train_time))
 
     def evolve(self, train_set, test_set):
         '''
@@ -151,7 +168,7 @@ class Evolver:
                 member.train_time = self.train(member, train_set)
                 member.avg_err = self.test(member, test_set)
 
-                print('  {}/{}: avg_err = {} train time = {}'.format(
+                print('  {}/{}: avg_err = {} train_time = {}'.format(
                     i+1, self.pop_size, member.avg_err, member.train_time))
 
             self.print_stats()
@@ -160,7 +177,7 @@ class Evolver:
             self.rank_members()
 
             # Top members mate
-            parents = self.pop[:self.pop_size//2]
+            parents = self.pop[0:self.pop_size//4]
             self.breed(parents)
             print()
 

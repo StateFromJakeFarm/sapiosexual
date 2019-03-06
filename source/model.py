@@ -19,6 +19,7 @@ class Model(nn.Module):
         if layers:
             # Use provided network architecture
             self.layers = layers
+            self.length = len(layers)
 
     def init_random(self, max_layers, max_layer_size, layer_types, input_dim, output_dim):
         '''
@@ -39,7 +40,7 @@ class Model(nn.Module):
                 layer_output_dim = output_dim
             else:
                 # This is an intermediate layer, initialize with random output dimension
-                layer_output_dim = rand.randint(1, max_layer_size)
+                layer_output_dim = rand.randint(2, max_layer_size)
 
             # Initialize layer
             layer = self.init_layer(rand.choice(layer_types), max_layer_size,
