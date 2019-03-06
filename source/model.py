@@ -13,7 +13,7 @@ class Model(nn.Module):
         '''
         super(Model, self).__init__()
         self.layers = nn.Sequential()
-        self.acc = -1
+        self.avg_err = -1
         self.train_time = -1
 
         if layers:
