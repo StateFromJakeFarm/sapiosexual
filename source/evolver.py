@@ -12,7 +12,7 @@ class Evolver:
     def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear],
         input_dim=10, output_dim=10, pop_size=10, num_generations=10, loss_function=nn.L1Loss,
         optimizer=optim.Rprop, trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2,
-        alpha=0.001):
+        alpha=0.001, device_ids=None):
         '''
         Constructor
         '''
@@ -29,8 +29,15 @@ class Evolver:
         self.num_epochs = num_epochs
         self.mutation_pct = mutation_pct
         self.alpha = alpha
+        self.device_ids = device_ids
 
         self.pop = []
+
+        # Use GPU if available
+        self.device = torch.device('cpu')
+        self.use_cuda = self.device_ids and torch.cuda.device_count() > 1
+        if self.use_cuda:
+            self.device = torch.device('cuda:0')
 
     def init_pop(self):
         '''
@@ -148,6 +155,12 @@ class Evolver:
             print('Generation {}'.format(gen+1))
             # Train each member of the population
             for i, member in enumerate(self.pop):
+                # Use GPU if available
+                member.to(self.device)
+                member.print()
+                if self.use_cuda:
+                    member = torch.nn.DataParallel(member, device_ids=self.device_ids)
+
                 member.train_time = self.train(member, train_set)
                 member.avg_err = self.test(member, test_set)
 
