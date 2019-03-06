@@ -60,6 +60,11 @@ class Evolver:
 
         for epoch in range(self.num_epochs):
             for sample in train_set:
+                if self.use_cuda:
+                    # Prep data for use on GPU
+                    sample[0] = sample[0].to(self.device)
+                    sample[1] = sample[1].to(self.device)
+
                 # Run data through network
                 output = member(sample[0])
 
@@ -79,6 +84,11 @@ class Evolver:
         '''
         err = 0.0
         for sample in test_set:
+            if self.use_cuda:
+                # Prep data for use on GPU
+                sample[0] = sample[0].to(self.device)
+                sample[1] = sample[1].to(self.device)
+
             output = member(sample[0])
             err += self.loss_function(output, sample[1])
 
@@ -174,7 +184,6 @@ class Evolver:
             for i, member in enumerate(self.pop):
                 # Use GPU if available
                 member.to(self.device)
-                member.print()
                 if self.use_cuda:
                     member = torch.nn.DataParallel(member, device_ids=self.device_ids)
 
