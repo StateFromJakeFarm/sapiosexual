@@ -60,13 +60,12 @@ class Evolver:
 
         for epoch in range(self.num_epochs):
             for sample in train_set:
-                if self.use_cuda:
-                    # Prep data for use on GPU
-                    sample[0] = sample[0].to(self.device)
-                    sample[1] = sample[1].to(self.device)
+                # Prep data for use on device
+                sample[0] = sample[0].to(self.device)
+                sample[1] = sample[1].to(self.device)
 
                 # Run data through network
-                output = member(sample[0])
+                output = member(sample[0]).to(self.device)
 
                 # Calculate error
                 loss = self.loss_function(output, sample[1])
@@ -84,16 +83,15 @@ class Evolver:
         '''
         err = 0.0
         for sample in test_set:
-            if self.use_cuda:
-                # Prep data for use on GPU
-                sample[0] = sample[0].to(self.device)
-                sample[1] = sample[1].to(self.device)
+            # Prep data for use on device
+            sample[0] = sample[0].to(self.device)
+            sample[1] = sample[1].to(self.device)
 
             output = member(sample[0])
             err += self.loss_function(output, sample[1])
 
             if print_outputs:
-                print(sample[1], output)
+                print(sample[0], sample[1], output)
 
         return err/len(test_set)
 
@@ -114,39 +112,22 @@ class Evolver:
         '''
         Create child by crossing traits (layers) of two parents
         '''
-        # Must include first and last layers
-        p1_ind = 1
-        if p1.length > 2:
-            p1_ind = rand.randint(1, p1.length-1)
-        p2_ind = 1
-        if p2.length > 2:
-            p2_ind = rand.randint(1, p2.length-1)
-
-        # Splice layers
-        layers = nn.Sequential()
-        for i in range(p1_ind+1):
-            layers.add_module(str(i), p1.layers[i])
-
-        for i in range(p2.length - p2_ind):
-            if i == 0:
-                layer = nn.Linear(p1.layers[p1_ind-1].out_features, p2.layers[p2_ind+i].out_features)
-            else:
-                layer = p2.layers[p2_ind+i]
-
-            layers.add_module(str(p1_ind+i), layer)
-
-        return Model(layers=layers)
+        p1_h = len(p1.layers)//2
+        p2_h = len(p2.layers)//2
+        return Model(layers=p1.layers[:p1_h] + p2.layers[p2_h:])
 
     def breed(self, parents):
         '''
         Mix features of parents and add mutations to produce next generation
         '''
         self.pop = []
-        for i, p1 in enumerate(parents):
+        i = 0
+        while len(self.pop) < self.pop_size:
+            p1 = parents[i]
             if i+1 >= len(parents):
                 # Recycle best member if there aren't enough "top" members for
                 # exclusive pairings
-                p2 = parents[1]
+                p2 = parents[0]
             else:
                 p2 = parents[i+1]
 
@@ -158,12 +139,19 @@ class Evolver:
             self.pop.append(self.crossover(p2, p1))
             self.pop.append(self.crossover(p2, p1))
 
+            i += 1
+            if i == len(parents):
+                i = 0
+
+        # Cut out overflow (lazy)
+        self.pop = self.pop[:self.pop_size]
+
     def print_stats(self):
         '''
         Print general information about the population
         '''
         avg_len = np.mean([m.length for m in self.pop])
-        avg_layer_size = np.mean([np.mean([l.in_features + l.out_features for l in m.layers]) for m in self.pop])
+        avg_layer_size = np.mean([np.mean([l.in_features + l.out_features for l in m.layers[::2]]) for m in self.pop])
         lowest_avg_err = min([float(m.avg_err) for m in self.pop])
         avg_train_time = np.mean([float(m.train_time) for m in self.pop])
 
@@ -201,9 +189,10 @@ class Evolver:
             # Top members mate
             parents = self.pop[0:self.pop_size//4]
             self.breed(parents)
+
             print()
 
         # Print out structure of top member and test it
         top_member = self.pop[0]
-        top_member.print()
+        print(top_member.layers)
         self.test(top_member, test_set, print_outputs=True)

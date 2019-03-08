@@ -51,6 +51,7 @@ class Model(nn.Module):
 
             # Add layer to our container (which represents entire network architecture)
             self.layers.add_module(str(i), layer)
+            self.layers.add_module('{}_ReLU'.format(i), nn.ReLU())
 
 
     def init_layer(self, layer_type, max_layer_size, input_dim, output_dim):
