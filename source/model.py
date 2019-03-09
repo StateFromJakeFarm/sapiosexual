@@ -1,7 +1,9 @@
-# Represents a PyTorch neural network to be optimized by the Evolver object
+# Represents an entire neural network
 import torch
 import torch.nn as nn
 import numpy.random as rand
+
+from layer import Layer
 
 class Model(nn.Module):
     '''
@@ -12,20 +14,21 @@ class Model(nn.Module):
         Constructor
         '''
         super(Model, self).__init__()
-        self.layers = nn.Sequential()
+        self.layers = []
+        self.graph = nn.Sequential()
         self.avg_err = -1
         self.train_time = -1
 
         if layers:
             # Use provided network architecture
-            self.layers = layers
             self.length = len(layers)
+            self.layers = layers
+            self.build_graph()
 
-    def init_random(self, max_layers, max_layer_size, layer_types, input_dim, output_dim):
+    def init_random(self, max_layers, max_layer_size, layer_types, act_types, input_dim, output_dim):
         '''
         Create a random structure for the network
         '''
-        layer_input_dim = -1
         self.length = rand.randint(2, max_layers) # Number of layers in network
         for i in range(self.length):
             layer_output_dim = -1
@@ -33,6 +36,8 @@ class Model(nn.Module):
                 # This is the first layer in the network, enforce input dimension to
                 # match data
                 layer_input_dim = input_dim
+            else:
+                layer_input_dim = self.layers[-1].out_features
 
             if i == self.length-1:
                 # This is the last layer in the network, enforece output dimension to
@@ -40,37 +45,41 @@ class Model(nn.Module):
                 layer_output_dim = output_dim
             else:
                 # This is an intermediate layer, initialize with random output dimension
-                layer_output_dim = rand.randint(2, max_layer_size)
+                layer_output_dim = rand.randint(1, max_layer_size)
 
-            # Initialize layer
-            layer = self.init_layer(rand.choice(layer_types), max_layer_size,
-                layer_input_dim, layer_output_dim)
+            # Create layer
+            layer_type = rand.choice(layer_types)
+            layer_act = rand.choice(act_types)
+            attrs = {
+                'in_features': layer_input_dim,
+                'out_features': layer_output_dim,
+                'activation': layer_act
+            }
+            new_layer = Layer(layer_type, attrs)
 
-            # Update input dimension for next layer
-            layer_input_dim = layer.out_features
+            # Add layer to network
+            self.layers.append(new_layer)
 
-            # Add layer to our container (which represents entire network architecture)
-            self.layers.add_module(str(i), layer)
-            self.layers.add_module('{}_ReLU'.format(i), nn.ReLU())
+        self.build_graph()
 
-
-    def init_layer(self, layer_type, max_layer_size, input_dim, output_dim):
+    def build_graph(self):
         '''
-        Randomly initialize layer's features
+        Decompose Layer objects into a string of PyTorch layers
         '''
-        if layer_type == nn.Linear:
-            return nn.Linear(input_dim, output_dim)
+        i = 0
+        for l in self.layers:
+            for elm in l.components:
+                self.graph.add_module(str(i), elm)
+                i += 1
 
     def forward(self, x):
         '''
         Forward propogation
         '''
-        return self.layers.forward(x)
+        return self.graph.forward(x)
 
     def print(self):
         '''
         Print a summary of the network's features
         '''
-        for layer in self.layers:
-            if type(layer) == nn.Linear:
-                print('Linear: {} --> {}'.format(layer.in_features, layer.out_features))
+        print(self.layers)

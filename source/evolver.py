@@ -6,10 +6,12 @@ import torch.optim as optim
 import numpy as np
 import numpy.random as rand
 
+from copy import deepcopy
+from layer import Layer
 from model import Model
 
 class Evolver:
-    def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear],
+    def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear], act_types=[nn.Sigmoid, nn.ReLU],
         input_dim=10, output_dim=10, pop_size=10, num_generations=10, loss_function=nn.L1Loss,
         optimizer=optim.Rprop, trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2,
         alpha=0.001, device_ids=None):
@@ -19,6 +21,7 @@ class Evolver:
         self.max_layers = max_layers
         self.max_layer_size = max_layer_size
         self.layer_types = layer_types
+        self.act_types = act_types
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.pop_size = pop_size
@@ -43,7 +46,8 @@ class Evolver:
         '''
         Create a starting population of random individuals
         '''
-        params = (self.max_layers, self.max_layer_size, self.layer_types, self.input_dim, self.output_dim)
+        params = (self.max_layers, self.max_layer_size, self.layer_types, self.act_types, self.input_dim,
+            self.output_dim)
 
         self.pop = [Model() for _ in range(self.pop_size)]
         for member in self.pop:
@@ -55,7 +59,7 @@ class Evolver:
         '''
         Train a model and return time to train
         '''
-        optimizer = self.optimizer(member.parameters(), lr=self.alpha)
+        optimizer = self.optimizer(member.graph.parameters(), lr=self.alpha)
         start = time.time()
 
         for epoch in range(self.num_epochs):
@@ -65,7 +69,7 @@ class Evolver:
                 sample[1] = sample[1].to(self.device)
 
                 # Run data through network
-                output = member(sample[0]).to(self.device)
+                output = member.graph(sample[0]).to(self.device)
 
                 # Calculate error
                 loss = self.loss_function(output, sample[1])
@@ -112,9 +116,17 @@ class Evolver:
         '''
         Create child by crossing traits (layers) of two parents
         '''
-        p1_h = len(p1.layers)//2
-        p2_h = len(p2.layers)//2
-        return Model(layers=p1.layers[:p1_h] + p2.layers[p2_h:])
+        p1_num_layers = rand.randint(1, len(p1.layers))
+        p1_layers = [deepcopy(l) for l in p1.layers[:p1_num_layers]]
+
+        p2_num_layers = self.max_layers - p1_num_layers
+        p2_offset = len(p2.layers) - min(len(p2.layers), p2_num_layers)
+        p2_layers = [deepcopy(l) for l in p2.layers[p2_offset:]]
+
+        p2_layers[0].in_features = p1_layers[-1].out_features
+        p2_layers[0].build_components()
+
+        return Model(layers=p1_layers + p2_layers)
 
     def breed(self, parents):
         '''
@@ -187,12 +199,12 @@ class Evolver:
             self.rank_members()
 
             # Top members mate
-            parents = self.pop[0:self.pop_size//4]
+            parents = self.pop[:self.pop_size//4]
             self.breed(parents)
 
             print()
 
         # Print out structure of top member and test it
         top_member = self.pop[0]
-        print(top_member.layers)
+        print(top_member.graph)
         self.test(top_member, test_set, print_outputs=True)
