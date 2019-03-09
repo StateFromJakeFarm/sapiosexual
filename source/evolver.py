@@ -199,8 +199,9 @@ class Evolver:
             self.rank_members()
 
             # Top members mate
-            parents = self.pop[:self.pop_size//4]
-            self.breed(parents)
+            if gen < self.num_generations - 1:
+                parents = self.pop[:self.pop_size//4]
+                self.breed(parents)
 
             print()
 

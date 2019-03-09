@@ -45,7 +45,7 @@ class Model(nn.Module):
                 layer_output_dim = output_dim
             else:
                 # This is an intermediate layer, initialize with random output dimension
-                layer_output_dim = rand.randint(1, max_layer_size)
+                layer_output_dim = rand.randint(2, max_layer_size)
 
             # Create layer
             layer_type = rand.choice(layer_types)
