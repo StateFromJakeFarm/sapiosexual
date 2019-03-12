@@ -5,8 +5,8 @@ import numpy as np
 
 from evolver import Evolver
 
-e = Evolver(pop_size=15, max_layer_size=30, max_layers=10, input_dim=4, output_dim=2, trait_weights=[1, 0], num_generations=5, alpha=0.005, num_epochs=1000,
-    loss_function=nn.MSELoss, device_ids=[0], act_types=[nn.ReLU])
+e = Evolver(pop_size=20, max_layer_size=50, max_layers=15, input_dim=4, output_dim=2, trait_weights=[1, 0], num_generations=5, alpha=0.005, num_epochs=1000,
+    loss_function=nn.MSELoss, device_ids=[0])
 
 train_data = []
 for i in range(16):
