@@ -14,7 +14,8 @@ class Evolver:
     def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear],
         act_types=[nn.Sigmoid, nn.ReLU, nn.Tanh], input_dim=10, output_dim=10, pop_size=10,
         num_generations=10, loss_function=nn.L1Loss, optimizer=optim.Rprop,
-        trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2, alpha=0.001, device_ids=None):
+        trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2, parent_pct=0.25,
+        alpha=0.001, device_ids=None):
         '''
         Constructor
         '''
@@ -31,6 +32,7 @@ class Evolver:
         self.trait_weights = trait_weights
         self.num_epochs = num_epochs
         self.mutation_pct = mutation_pct
+        self.parent_pct = parent_pct
         self.alpha = alpha
         self.device_ids = device_ids
 
@@ -306,7 +308,7 @@ class Evolver:
 
             if gen < self.num_generations - 1:
                 # Top members breed to produce next generation
-                parents = self.pop[:self.pop_size//4]
+                parents = self.pop[:int(self.pop_size*self.parent_pct)]
                 self.breed(parents)
 
                 # Some portion of new population undergoes mutation to
