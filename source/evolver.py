@@ -7,14 +7,14 @@ import numpy as np
 import numpy.random as rand
 
 from copy import deepcopy
-from layer import Layer
 from model import Model
+from layer import Layer
 
 class Evolver:
-    def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear], act_types=[nn.Sigmoid, nn.ReLU],
-        input_dim=10, output_dim=10, pop_size=10, num_generations=10, loss_function=nn.L1Loss,
-        optimizer=optim.Rprop, trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2,
-        alpha=0.001, device_ids=None):
+    def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear],
+        act_types=[nn.Sigmoid, nn.ReLU, nn.Tanh], input_dim=10, output_dim=10, pop_size=10,
+        num_generations=10, loss_function=nn.L1Loss, optimizer=optim.Rprop,
+        trait_weights=[1, -1], num_epochs=100, mutation_pct=0.2, alpha=0.001, device_ids=None):
         '''
         Constructor
         '''
@@ -105,28 +105,130 @@ class Evolver:
         '''
         self.pop = sorted(self.pop, key=lambda m: m.avg_err*self.trait_weights[0] + m.train_time*self.trait_weights[1])
 
-    def gen_mutation(self):
-        layer_type = rand.choice(self.layer_types)
-        if layer_type == nn.Linear:
-            input_dim = rand.randint(2, self.max_layer_size)
-            output_dim = rand.randint(2, self.max_layer_size)
-            return nn.Linear(input_dim, output_dim)
-
     def crossover(self, p1, p2):
         '''
         Create child by crossing traits (layers) of two parents
         '''
+        # Grab some number of layers from the start of p1's graph
         p1_num_layers = rand.randint(1, len(p1.layers))
         p1_layers = [deepcopy(l) for l in p1.layers[:p1_num_layers]]
 
-        p2_num_layers = self.max_layers - p1_num_layers
-        p2_offset = len(p2.layers) - min(len(p2.layers), p2_num_layers)
+        # Grab remaining layers from end of p2's graph
+        high = min(self.max_layers - p1_num_layers, len(p2.layers))
+        if high > 0:
+            p2_offset = rand.randint(0, high)
+        else:
+            p2_offset = 1
+
         p2_layers = [deepcopy(l) for l in p2.layers[p2_offset:]]
 
+        # Couple two pieces together
         p2_layers[0].in_features = p1_layers[-1].out_features
         p2_layers[0].build_components()
 
         return Model(layers=p1_layers + p2_layers)
+
+    def mutate(self, member):
+        '''
+        Apply some mutation to member of population
+        '''
+        def replace_layer(member):
+            # Choose random layer to replace
+            i = rand.randint(0, len(member.layers))
+            old_layer = member.layers[i]
+
+            # Generate new layer
+            layer_type = rand.choice(self.layer_types)
+            layer_act = rand.choice(self.act_types)
+            attrs = {
+                'in_features': old_layer.in_features,
+                'out_features': old_layer.out_features,
+                'activation': layer_act
+            }
+
+            # Stitch new layer into model
+            if i < len(member.layers)-1:
+                # Choose random output dimension if we didn't pick the final layer
+                attrs['out_features'] = rand.randint(2, self.max_layer_size)
+                member.layers[i+1].in_features = attrs['out_features']
+                member.layers[i+1].build_components()
+
+            # Construct layer
+            new_layer = Layer(layer_type, attrs)
+            new_layer.build_components()
+
+            # Replace layer in graph
+            member.layers[i] = new_layer
+            member.build_graph()
+
+        def add_layer(member):
+            if len(member.layers) >= self.max_layers:
+                # Don't add layers to models that are already at capacity
+                return
+
+            # Choose random index after which the new layer will be inserted
+            i = rand.randint(-1, len(member.layers))
+
+            # Generate new layer
+            layer_type = rand.choice(self.layer_types)
+            layer_act = rand.choice(self.act_types)
+
+            # Determine input features
+            if i == -1:
+                # First layer's input dimension must match data
+                in_features = member.layers[0].in_features
+            else:
+                # Input dimension matches that of previous layer
+                in_features = member.layers[i].out_features
+
+            # Determine output features
+            if i < len(member.layers)-1:
+                # Change subsequent layer's input dimension to match that of new layer
+                out_features = rand.randint(2, self.max_layer_size)
+                member.layers[i+1].in_features = out_features
+                member.layers[i+1].build_components()
+            else:
+                # Final layer must have same output dimension as data
+                out_features = member.layers[-1].out_features
+
+            attrs = {
+                'in_features': in_features,
+                'out_features': out_features,
+                'activation': layer_act
+            }
+
+            # Create layer
+            new_layer = Layer(layer_type, attrs)
+            new_layer.build_components()
+
+            # Insert new layer into graph
+            member.layers.insert(i+1, new_layer)
+            member.build_graph()
+
+        def remove_layer(member):
+            # Select layer to remove at random
+            i = rand.randint(0, len(member.layers))
+
+            # Stitch remaining surrounding layers together
+            if i == 0:
+                member.layers[1].in_features = member.layers[0].in_features
+                member.layers[1].build_components()
+            elif i == len(member.layers)-1:
+                member.layers[i-1].out_features = member.layers[i].out_features
+                member.layers[i-1].build_components()
+            else:
+                member.layers[i+1].in_features = member.layers[i-1].out_features
+                member.layers[i+1].build_components()
+
+            # Remove layer from graph
+            del member.layers[i]
+            member.build_graph()
+
+        return {
+            0: replace_layer,
+            1: add_layer,
+            2: remove_layer
+        }[rand.randint(0, 3)](member)
 
     def breed(self, parents):
         '''
@@ -155,6 +257,10 @@ class Evolver:
             if i == len(parents):
                 i = 0
 
+        # Randomly choose members of population to mutate
+        for member in rand.choice(a=self.pop, size=int(self.pop_size*self.mutation_pct)):
+            self.mutate(member)
+
         # Cut out overflow (lazy)
         self.pop = self.pop[:self.pop_size]
 
@@ -162,7 +268,7 @@ class Evolver:
         '''
         Print general information about the population
         '''
-        avg_len = np.mean([m.length for m in self.pop])
+        avg_len = np.mean([len(m.layers) for m in self.pop])
         avg_layer_size = np.mean([np.mean([l.in_features + l.out_features for l in m.layers[::2]]) for m in self.pop])
         lowest_avg_err = min([float(m.avg_err) for m in self.pop])
         avg_train_time = np.mean([float(m.train_time) for m in self.pop])
@@ -198,14 +304,19 @@ class Evolver:
             # Discover the most "fit" members
             self.rank_members()
 
-            # Top members mate
             if gen < self.num_generations - 1:
+                # Top members breed to produce next generation
                 parents = self.pop[:self.pop_size//4]
                 self.breed(parents)
+
+                # Some portion of new population undergoes mutation to
+                # maintain randomness to more fully explore the search
+                # space of architectures even as certain traits become
+                # more popular in the population
 
             print()
 
         # Print out structure of top member and test it
         top_member = self.pop[0]
-        print(top_member.graph)
+        top_member.print()
         self.test(top_member, test_set, print_outputs=True)

@@ -67,6 +67,7 @@ class Model(nn.Module):
         Decompose Layer objects into a string of PyTorch layers
         '''
         i = 0
+        self.graph = nn.Sequential()
         for l in self.layers:
             for elm in l.components:
                 self.graph.add_module(str(i), elm)
@@ -80,6 +81,6 @@ class Model(nn.Module):
 
     def print(self):
         '''
-        Print a summary of the network's features
+        Print network's layers
         '''
-        print(self.layers)
+        print(self.graph)
