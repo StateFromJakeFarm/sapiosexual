@@ -15,19 +15,19 @@ class Layer:
 
         # Different layers expect different attributes
         expected_attrs = {
-            nn.Linear: ['in_features', 'out_features', 'activation']
+            nn.Linear: ['in_features', 'out_features', 'activation', 'p']
         }.get(layer_type)
 
         if not expected_attrs:
             # Unknown layer type
-            raise ValueError('{} is not a recognized layer type'.format(str(layer)))
+            raise ValueError('{} is not a recognized layer type'.format(str(layer_type)))
 
         # Make all passed attributes into attributes of this class
         for attr_name in expected_attrs:
             attr_val = attrs.get(attr_name)
-            if not attr_val:
+            if attr_val is None:
                 # Missing required attribute
-                raise ValueError('{} requires attribute {}'.format(str(layer), attr_name))
+                raise ValueError('{} requires attribute {}'.format(str(layer_type), attr_name))
 
             setattr(self, attr_name, attr_val)
 
@@ -43,6 +43,9 @@ class Layer:
             # Linear layer needs activation function coupled with it
             self.components.append(nn.Linear(self.in_features, self.out_features))
             self.components.append(self.activation())
+
+            if self.p:
+                self.components.append(nn.Dropout(self.p))
 
     def print(self):
         '''

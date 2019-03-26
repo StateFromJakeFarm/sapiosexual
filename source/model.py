@@ -53,7 +53,8 @@ class Model(nn.Module):
             attrs = {
                 'in_features': layer_input_dim,
                 'out_features': layer_output_dim,
-                'activation': layer_act
+                'activation': layer_act,
+                'p': rand.ranf() if rand.randint(0, 2) else 0.0
             }
             new_layer = Layer(layer_type, attrs)
 

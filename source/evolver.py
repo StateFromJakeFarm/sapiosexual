@@ -11,6 +11,9 @@ from model import Model
 from layer import Layer
 
 class Evolver:
+    '''
+    Evolves neural network architectures for classification problems
+    '''
     def __init__(self, max_layers=10, max_layer_size=10, layer_types=[nn.Linear],
         act_types=[nn.Sigmoid, nn.ReLU, nn.Tanh], input_dim=10, output_dim=10, pop_size=10,
         num_generations=10, loss_function=nn.L1Loss, optimizer=optim.Rprop,
@@ -145,7 +148,8 @@ class Evolver:
             attrs = {
                 'in_features': old_layer.in_features,
                 'out_features': old_layer.out_features,
-                'activation': layer_act
+                'activation': layer_act,
+                'p': rand.ranf() if rand.randint(0, 2) else 0.0
             }
 
             # Stitch new layer into model
@@ -196,7 +200,8 @@ class Evolver:
             attrs = {
                 'in_features': in_features,
                 'out_features': out_features,
-                'activation': layer_act
+                'activation': layer_act,
+                'p': rand.ranf() if rand.randint(0, 2) else 0.0
             }
 
             # Create layer
